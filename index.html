@@ -106,7 +106,7 @@ td:last-child,th:last-child{text-align:right}
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
 <div id="printArea"></div>
 <script>
-var APP={nama:'MyWarisan',ver:'0.8',tarikh:'22 Nov 2026',tahun:2026};
+var APP={nama:'MyWarisan',ver:'0.9',tarikh:'22 Nov 2026',tahun:2026};
 var KEY='mywarisan_v1';
 var insToggleFn=null;
 var KAT=[
@@ -305,7 +305,7 @@ function modelText(m){
 }
 
 var FIELDS={
- harta:[{k:'kat',l:'Kategori',t:'kat'},{k:'nama',l:'Nama harta',ph:'Contoh: Rumah Batu Gajah'},{k:'jumlah',l:'Anggaran nilai (RM)',t:'num'},{k:'insJenis',l:'Jenis insurans',t:'sel2',o:[['','Belum diisi'],['kom','Komprehensif'],['p3','Pihak ketiga'],['tiada','Tiada']]},{k:'insSyarikat',l:'Syarikat insurans',ph:'Contoh: Takaful Malaysia'},{k:'insTamat',l:'Tarikh tamat insurans',t:'tarikh'},{k:'jalanTamat',l:'Tarikh tamat cukai jalan',t:'tarikh'},{k:'penamaId',l:'Penama',t:'pen'},{k:'lokId',l:'Dokumen disimpan di',t:'lok'},{k:'nota',l:'Catatan',ph:'Contoh: geran dalam fail biru'}],
+ harta:[{k:'kat',l:'Kategori',t:'kat'},{k:'nama',l:'Nama harta',ph:'Contoh: Rumah Batu Gajah'},{k:'jumlah',l:'Anggaran nilai (RM)',t:'num'},{k:'insJenis',l:'Jenis insurans',t:'sel2',o:[['','Belum diisi'],['kom','Komprehensif'],['p3','Pihak ketiga'],['tiada','Tiada']]},{k:'insSyarikat',l:'Syarikat insurans',ph:'Contoh: Takaful Malaysia'},{k:'insNilai',l:'Nilai dilindungi (RM)',t:'num'},{k:'insTamat',l:'Tarikh tamat insurans',t:'tarikh'},{k:'jalanTamat',l:'Tarikh tamat cukai jalan',t:'tarikh'},{k:'penamaId',l:'Penama',t:'pen'},{k:'lokId',l:'Dokumen disimpan di',t:'lok'},{k:'nota',l:'Catatan',ph:'Contoh: geran dalam fail biru'}],
  hutang:[{k:'nama',l:'Nama hutang',ph:'Contoh: Loan rumah'},{k:'jumlah',l:'Baki hutang (RM)',t:'num'},{k:'takId',l:'Dilindungi oleh',t:'tak'},{k:'lindung',l:'Jumlah dilindungi',t:'sel2',o:[['penuh','Penuh (baki hutang diselesaikan)'],['sebahagian','Sebahagian']]},{k:'lindungAmt',l:'Jumlah dilindungi (RM)',t:'num'},{k:'nota',l:'Nota',ph:''}],
  waris:[{k:'nama',l:'Nama penuh (ikut IC)'},{k:'hubungan',l:'Hubungan',t:'sel',o:['Isteri','Suami','Anak lelaki','Anak perempuan','Bapa','Ibu','Abang / adik','Lain-lain']},{k:'tel',l:'No. telefon',t:'tel'},{k:'ic',l:'No. IC (pilihan, untuk kira umur anak)',t:'ic'},{k:'sa',l:'Guna alamat keluarga',t:'chk'},{k:'ad',l:'Alamat lain',t:'area'},{k:'pn',l:'Peranan penama',t:'sel2',o:[['','Bukan penama'],['utama','Penama utama'],['ganti','Penama ganti']]},{k:'wasi',l:'Wasi',t:'chk'},{k:'w',l:'Waris faraid',t:'chk'}],
  dok:[{k:'nama',l:'Dokumen',ph:'Contoh: Geran rumah'},{k:'lokId',l:'Disimpan di',t:'lok'},{k:'lokasi',l:'Catatan',ph:'Contoh: folder Harta, geran-rumah.pdf'}],
@@ -365,7 +365,7 @@ function wireLokasi(){
  function upd(){var dig=j.value==='Digital';document.getElementById('w_idakaun').style.display=dig?'':'none';document.getElementById('w_petunjuk').style.display=dig?'':'none'}
  j.onchange=upd;upd()
 }
-var INS=['insJenis','insSyarikat','insTamat','jalanTamat'];
+var INS=['insJenis','insSyarikat','insNilai','insTamat','jalanTamat'];
 function wireHarta(){
  var kat=document.getElementById('f_kat'),pw=document.getElementById('w_penamaId'),nm=document.getElementById('f_nama');
  var tg=document.createElement('div');tg.className='chk';tg.style.cursor='pointer';tg.setAttribute('data-act','insToggle');
@@ -534,10 +534,10 @@ function tamatTag(lbl,iso){
  return'<span class="tag" style="background:var(--soft);color:var(--pri-d)">'+lbl+' tamat '+fmtDate(new Date(iso+'T00:00:00'))+'</span>'
 }
 var INSN={kom:'Komprehensif',p3:'Pihak ketiga',tiada:'Tiada'};
-function insLine(h){return[INSN[h.insJenis],h.insSyarikat].filter(Boolean).join(', ')}
+function insLine(h){return[INSN[h.insJenis],h.insSyarikat,num(h.insNilai)>0?'dilindungi '+rm(num(h.insNilai)):''].filter(Boolean).join(', ')}
 function insTags(h){
  if(h.kat!=='kenderaan')return'';
- if(!h.insJenis&&!h.insSyarikat&&!h.insTamat&&!h.jalanTamat)return'<span class="tag" style="background:#efece0;color:#6b7344">Insurans belum diisi</span>';
+ if(!h.insJenis&&!h.insSyarikat&&!h.insNilai&&!h.insTamat&&!h.jalanTamat)return'<span class="tag" style="background:#efece0;color:#6b7344">Insurans belum diisi</span>';
  return tamatTag('Insurans',h.insTamat)+tamatTag('Cukai jalan',h.jalanTamat)
 }
 function insWarn(){
