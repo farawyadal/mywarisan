@@ -106,12 +106,12 @@ td:last-child,th:last-child{text-align:right}
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
 <div id="printArea"></div>
 <script>
-var APP={nama:'MyWarisan',ver:'0.2',tarikh:'22 Nov 2026',tahun:2026};
+var APP={nama:'MyWarisan',ver:'0.3',tarikh:'22 Nov 2026',tahun:2026};
 var KEY='mywarisan_v1';
 var KAT=[
  {id:'hartanah',n:'Hartanah',s:'Rumah, tanah'},
  {id:'kenderaan',n:'Kenderaan',s:'Kereta, motor'},
- {id:'bank',n:'Wang dan bank',s:'Akaun, tunai'},
+ {id:'bank',n:'Wang dan bank',s:'Akaun, tunai',nom:1},
  {id:'simpanan',n:'Simpanan',s:'KWSP, TH, ASB',nom:1},
  {id:'takaful',n:'Insurans dan takaful',s:'Manfaat kematian',nom:1},
  {id:'khairat',n:'Khairat kematian',s:'Bantuan, bukan harta',noval:1},
@@ -142,14 +142,23 @@ function icInfo(ic){
 function maskIc(v){var d=String(v||'').replace(/\D/g,'');return d?'••••••••'+d.slice(-4):''}
 function namesBy(role){return S.waris.filter(function(w){return w.pn===role}).map(function(w){return w.nama})}
 function defNom(){var u=namesBy('utama'),g=namesBy('ganti');return u.length?{u:u.join(', '),g:g.join(', ')}:null}
-function hasNom(h){return!!(h.nominee||(S.defPenama&&defNom()))}
-function nomText(h){
- if(h.nominee)return'Nominee: '+h.nominee;
+function nomRes(h){
+ var id=h.penamaId;
+ if(id==='none')return null;
+ if(id&&id!=='def'){var w=S.waris.filter(function(x){return x.id===id})[0];if(w)return{t:'Penama: '+w.nama,custom:true}}
+ if(h.nominee)return{t:'Nominee: '+h.nominee,custom:true};
  var d=S.defPenama?defNom():null;
- return d?('Penama: '+d.u+(d.g?' · Ganti: '+d.g:'')+' (default)'):'Nominee: belum diisi'
+ return d?{t:'Penama: '+d.u+(d.g?' · Ganti: '+d.g:'')+' (default)',custom:false}:null
+}
+function hasNom(h){return!!nomRes(h)}
+function nomText(h){var r=nomRes(h);return r?r.t:'Penama belum diisi'}
+function penSelect(v){
+ var d=defNom(),cur=v||'def',h='<select id="f_penamaId"><option value="def"'+(cur==='def'?' selected':'')+'>'+(d?'Ikut default: '+esc(d.u)+(d.g?' · Ganti: '+esc(d.g):''):'Ikut default (belum ada penama, tambah di tab Waris)')+'</option>';
+ S.waris.forEach(function(w){h+='<option value="'+w.id+'"'+(cur===w.id?' selected':'')+'>'+esc(w.nama)+(w.hubungan?' ('+esc(w.hubungan)+')':'')+'</option>'});
+ return h+'<option value="none"'+(cur==='none'?' selected':'')+'>Tiada penama</option></select><div class="muted" id="penNote" style="margin-top:6px"></div>'
 }
 function warisUmur(w){var i=icInfo(w.ic);return i?i.age:null}
-function thNote(h,k){return(k.nom&&!h.nominee&&S.defPenama&&namesBy('ganti').length&&/tabung haji|^th$/i.test(h.nama))?'<small>Semak dengan TH: penama mesti waris yang layak</small>':''}
+function thNote(h,k){var r=nomRes(h);return(k.nom&&r&&!r.custom&&namesBy('ganti').length&&/tabung haji|^th$/i.test(h.nama))?'<small>Semak dengan TH: penama mesti waris yang layak</small>':''}
 
 function load(){
  try{var r=JSON.parse(localStorage.getItem(KEY)||'null');
@@ -265,7 +274,7 @@ function modelText(m){
 }
 
 var FIELDS={
- harta:[{k:'kat',l:'Kategori',t:'kat'},{k:'nama',l:'Nama harta',ph:'Contoh: Rumah Batu Gajah'},{k:'jumlah',l:'Anggaran nilai (RM)',t:'num'},{k:'nominee',l:'Nama nominee (jika ada)',ph:'Untuk KWSP, TH, ASB, takaful'},{k:'nota',l:'Nota atau lokasi dokumen',ph:'Contoh: geran dalam fail biru'}],
+ harta:[{k:'kat',l:'Kategori',t:'kat'},{k:'nama',l:'Nama harta',ph:'Contoh: Rumah Batu Gajah'},{k:'jumlah',l:'Anggaran nilai (RM)',t:'num'},{k:'penamaId',l:'Penama',t:'pen'},{k:'nota',l:'Nota atau lokasi dokumen',ph:'Contoh: geran dalam fail biru'}],
  hutang:[{k:'nama',l:'Nama hutang',ph:'Contoh: Loan rumah'},{k:'jumlah',l:'Baki hutang (RM)',t:'num'},{k:'nota',l:'Nota',ph:''}],
  waris:[{k:'nama',l:'Nama penuh (ikut IC)'},{k:'hubungan',l:'Hubungan',t:'sel',o:['Isteri','Suami','Anak lelaki','Anak perempuan','Bapa','Ibu','Abang / adik','Lain-lain']},{k:'tel',l:'No. telefon',t:'tel'},{k:'ic',l:'No. IC (pilihan, untuk kira umur anak)',t:'ic'},{k:'sa',l:'Guna alamat keluarga',t:'chk'},{k:'ad',l:'Alamat lain',t:'area'},{k:'pn',l:'Peranan penama',t:'sel2',o:[['','Bukan penama'],['utama','Penama utama'],['ganti','Penama ganti']]},{k:'wasi',l:'Wasi',t:'chk'},{k:'w',l:'Waris faraid',t:'chk'}],
  dok:[{k:'nama',l:'Dokumen',ph:'Contoh: Geran rumah'},{k:'lokasi',l:'Disimpan di mana',ph:''}],
@@ -277,6 +286,7 @@ function fieldHtml(f,v){
  if(f.t==='chk')return'<div class="chk"><span>'+f.l+'</span><input type="checkbox" id="f_'+f.k+'"'+(v?' checked':'')+'></div>';
  var h='<div id="w_'+f.k+'"><label>'+f.l+'</label>';
  if(f.t==='kat')h+='<select id="f_'+f.k+'">'+KAT.map(function(k){return'<option value="'+k.id+'"'+(k.id===v?' selected':'')+'>'+k.n+'</option>'}).join('')+'</select>';
+ else if(f.t==='pen')h+=penSelect(v);
  else if(f.t==='sel')h+='<select id="f_'+f.k+'">'+f.o.map(function(o){return'<option'+(o===v?' selected':'')+'>'+o+'</option>'}).join('')+'</select>';
  else if(f.t==='sel2')h+='<select id="f_'+f.k+'">'+f.o.map(function(o){return'<option value="'+o[0]+'"'+(o[0]===v?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select>';
  else if(f.t==='area')h+='<textarea id="f_'+f.k+'" rows="2">'+esc(v)+'</textarea>';
@@ -296,7 +306,7 @@ function openForm(type,id,kat){
  h+='<div class="row" style="margin-top:16px">'+(id?'<button class="btn red" data-act="del">Padam</button>':'')+'<button class="btn o" data-act="close">Batal</button><button class="btn" data-act="saveForm">Simpan</button></div>';
  document.getElementById('sheetIn').innerHTML=h;
  document.getElementById('sheet').classList.add('on');
- if(type==='waris')wireWaris(!id)
+ if(type==='waris')wireWaris(!id);else if(type==='harta')wireHarta()
 }
 function wireWaris(isNew){
  var hb=document.getElementById('f_hubungan'),sa=document.getElementById('f_sa');
@@ -310,6 +320,19 @@ function wireWaris(isNew){
   sa.checked=(v!=='Abang / adik');adr()
  }
 }
+function wireHarta(){
+ var kat=document.getElementById('f_kat'),pw=document.getElementById('w_penamaId'),nm=document.getElementById('f_nama');
+ var nb=document.createElement('div');nb.className='muted';nb.style.margin='10px 0 0';
+ nb.textContent='Rumah, tanah dan kenderaan tiada penama. Ia diurus oleh wasi melalui wasiat atau proses pusaka.';
+ pw.parentNode.insertBefore(nb,pw.nextSibling);
+ function upd(){
+  var has=!!katOf(kat.value).nom;
+  pw.style.display=has?'':'none';nb.style.display=has?'none':'';
+  var th=/tabung haji/i.test(nm.value),n=document.getElementById('penNote');
+  if(n)n.textContent=(has&&th)?'Tabung Haji: penama mesti waris yang layak. Semak sama ada waris ganti layak.':'Boleh tukar kepada waris lain yang dah didaftar di tab Waris.'
+ }
+ kat.onchange=upd;nm.oninput=upd;upd()
+}
 function closeSheet(){document.getElementById('sheet').classList.remove('on');cur=null}
 function saveForm(){
  var list=S[LIST[cur.type]],o={};
@@ -319,7 +342,7 @@ function saveForm(){
   if(o.ic){if(!icInfo(o.ic)){alert('No. IC tidak sah. Isi 12 digit tanpa sengkang.');return}o.ic=o.ic.replace(/\D/g,'')}
   if(o.sa)o.ad=''
  }
- if(cur.type==='harta')o.kemaskini=todayISO();
+ if(cur.type==='harta'){o.kemaskini=todayISO();o.nominee='';if(!katOf(o.kat).nom||o.penamaId==='def')o.penamaId=''}
  if(cur.id){var it=list.filter(function(x){return x.id===cur.id})[0];Object.assign(it,o)}
  else{o.id=uid();list.push(o)}
  if(cur.type==='harta')openCat[o.kat]=1;
@@ -333,7 +356,7 @@ function delItem(){
 
 function tagFor(h,k){
  var t='';
- if(k.nom)t=hasNom(h)?'<span class="tag" style="background:var(--soft);color:var(--pri-d)">'+esc(h.nominee?'Penama: '+h.nominee:'Penama default')+'</span>':'<span class="tag">Nominee?</span>';
+ if(k.nom){var r=nomRes(h);t=r?'<span class="tag" style="background:var(--soft);color:var(--pri-d)">'+esc(r.custom?r.t:'Penama default')+'</span>':'<span class="tag">Nominee?</span>'}
  if(daysSince(h.kemaskini)>365)t+='<span class="tag">Semak nilai</span>';
  return t
 }
