@@ -106,7 +106,7 @@ td:last-child,th:last-child{text-align:right}
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
 <div id="printArea"></div>
 <script>
-var APP={nama:'MyWarisan',ver:'0.7',tarikh:'22 Nov 2026',tahun:2026};
+var APP={nama:'MyWarisan',ver:'0.8',tarikh:'22 Nov 2026',tahun:2026};
 var KEY='mywarisan_v1';
 var insToggleFn=null;
 var KAT=[
@@ -248,7 +248,7 @@ function model(type,o){
    if(!it.length)return;
    secs.push({h:k.n,rows:it.map(function(h){
     var sub=[];if(h.kat==='kenderaan'){var il=insLine(h);if(il)sub.push('Insurans: '+il+(h.insTamat?', tamat '+fmtDate(new Date(h.insTamat+'T00:00:00')):''));if(h.jalanTamat)sub.push('Cukai jalan tamat '+fmtDate(new Date(h.jalanTamat+'T00:00:00')))}if(k.nom||h.nominee)sub.push(nomText(h));if(lokOf(h.lokId))sub.push('Dokumen: '+lokTxt(h.lokId,true));if(h.nota)sub.push(h.nota);
-    return{a:h.nama,b:(showAmt&&!k.noval)?rm(num(h.jumlah)):'',sub:sub.join(' · ')}
+    return{a:h.nama,b:showAmt?(k.noval?(num(h.jumlah)>0?'Anggaran '+rm(num(h.jumlah)):''):rm(num(h.jumlah))):'',sub:sub.join(' · ')}
    })})
   });
   if(s==='s4'&&HU().length)secs.push({h:'Hutang',rows:HU().map(function(h){return{a:h.nama,b:showAmt?rm(num(h.jumlah)):'',sub:[covText(h),h.nota].filter(Boolean).join(' · ')}})})
@@ -279,6 +279,7 @@ function model(type,o){
   }
   notes.push('Kalkulator asas: hanya isteri/suami, ibu, bapa dan anak. Kes lain (adik-beradik, cucu, datuk dan lain-lain) perlu dirujuk kepada pihak berkuasa.');
  }
+ if(showAmt&&HA().some(function(x){return x.kat==='khairat'&&num(x.jumlah)>0}))notes.push('Bantuan khairat tidak termasuk dalam harta pusaka dan tidak dikira dalam faraid. Anggaran dipaparkan sebagai maklumat sahaja.');
  notes.push('Dokumen ini senarai harta dan panduan, bukan wasiat yang sah. Wasiat rasmi perlu disahkan melalui Amanah Raya, peguam syarie atau pejabat agama.');
  var meta='Disediakan '+APP.tarikh+(S.nama?' · '+S.nama:'');
  return{title:title,meta:meta,secs:secs,totl:totl,notes:notes}
@@ -382,8 +383,10 @@ function wireHarta(){
  nb.textContent='Rumah, tanah dan kenderaan tiada penama. Ia diurus oleh wasi melalui wasiat atau proses pusaka.';
  pw.parentNode.insertBefore(nb,pw.nextSibling);
  function upd(){
-  var has=!!katOf(kat.value).nom;
+  var has=!!katOf(kat.value).nom,kh=kat.value==='khairat';
   pw.style.display=has?'':'none';nb.style.display=has?'none':'';
+  nb.textContent=kh?'Khairat bukan harta, jadi tiada penama dan tidak dikira dalam harta bersih.':'Rumah, tanah dan kenderaan tiada penama. Ia diurus oleh wasi melalui wasiat atau proses pusaka.';
+  document.querySelector('#w_jumlah label').textContent=kh?'Anggaran bantuan (pilihan, tak dikira)':'Anggaran nilai (RM)';
   var th=/tabung haji/i.test(nm.value),n=document.getElementById('penNote');
   if(n)n.textContent=(has&&th)?'Tabung Haji: penama mesti waris yang layak. Semak sama ada waris ganti layak.':'Boleh tukar kepada waris lain yang dah didaftar di tab Waris.'
  }
@@ -559,8 +562,8 @@ function vHarta(){
  h+='<div class="row" style="margin-bottom:10px"><button class="btn" data-act="add" data-t="harta">+ Tambah harta</button><button class="btn o" data-act="toggleHide">'+(S.hide?'Tunjuk jumlah':'Sorok jumlah')+'</button></div>';
  KAT.forEach(function(k){
   var it=HA().filter(function(x){return x.kat===k.id}),s=sumKat(k.id);
-  h+='<div class="cat'+(openCat[k.id]?' open':'')+'"><div class="hd" data-act="cat" data-id="'+k.id+'"><div class="ic">'+k.n.charAt(0)+'</div><div class="nm"><p>'+k.n+'</p><span>'+(it.length?it.length+' item':k.s)+'</span></div><div class="amt">'+(k.noval?(it.length?'-':''):money(s))+'</div></div><div class="items">';
-  it.forEach(function(x){h+='<div class="it"><div class="l" data-act="edit" data-t="harta" data-id="'+x.id+'">'+esc(x.nama)+tagFor(x,k)+insTags(x)+(x.kat==='kenderaan'&&insLine(x)?'<small>'+esc(insLine(x))+'</small>':'')+(x.nota?'<small>'+esc(x.nota)+'</small>':'')+thNote(x,k)+lokSmall(x)+'</div><div>'+(k.noval?'':money(num(x.jumlah)))+'</div></div>'});
+  h+='<div class="cat'+(openCat[k.id]?' open':'')+'"><div class="hd" data-act="cat" data-id="'+k.id+'"><div class="ic">'+k.n.charAt(0)+'</div><div class="nm"><p>'+k.n+'</p><span>'+(it.length?it.length+' item':k.s)+'</span></div><div class="amt">'+(k.noval?(it.length?'tak dikira':''):money(s))+'</div></div><div class="items">';
+  it.forEach(function(x){h+='<div class="it"><div class="l" data-act="edit" data-t="harta" data-id="'+x.id+'">'+esc(x.nama)+tagFor(x,k)+insTags(x)+(x.kat==='kenderaan'&&insLine(x)?'<small>'+esc(insLine(x))+'</small>':'')+(x.nota?'<small>'+esc(x.nota)+'</small>':'')+thNote(x,k)+lokSmall(x)+'</div><div>'+(k.noval?(num(x.jumlah)>0?'<span class="muted" style="text-align:right;display:block">'+money(num(x.jumlah))+'<br><span style="font-size:11px">tak dikira dalam harta</span></span>':''):money(num(x.jumlah)))+'</div></div>'});
   h+='<button class="btn o sm add" data-act="add" data-t="harta" data-k="'+k.id+'">+ Tambah di sini</button>'+(k.id==='piutang'?'<button class="btn o sm add" data-act="tarik">Tarik dari MyBajet</button>':'')+'</div></div>'
  });
  h+='<div class="cat'+(openCat.hutang?' open':'')+'"><div class="hd" data-act="cat" data-id="hutang"><div class="ic">H</div><div class="nm"><p>Hutang</p><span>Ditolak daripada harta (selepas takaful)</span></div><div class="amt" style="color:var(--red)">'+(t.debt?'- ':'')+money(t.debt)+'</div></div><div class="items">';
