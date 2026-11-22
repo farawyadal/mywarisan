@@ -106,7 +106,7 @@ td:last-child,th:last-child{text-align:right}
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
 <div id="printArea"></div>
 <script>
-var APP={nama:'MyWarisan',ver:'0.3',tarikh:'22 Nov 2026',tahun:2026};
+var APP={nama:'MyWarisan',ver:'0.4',tarikh:'22 Nov 2026',tahun:2026};
 var KEY='mywarisan_v1';
 var KAT=[
  {id:'hartanah',n:'Hartanah',s:'Rumah, tanah'},
@@ -120,7 +120,7 @@ var KAT=[
 ];
 var GRP={s1:['hartanah','kenderaan','lain'],s2:['bank','simpanan','takaful'],s3:['khairat'],s4:['piutang']};
 var GLBL={s1:'Hartanah, kenderaan, lain-lain',s2:'Bank, simpanan, takaful',s3:'Khairat kematian',s4:'Hutang dan piutang'};
-var DEF={nama:'',alamat:'',defPenama:true,semak:'',wasiat:'belum',hide:false,harta:[],hutang:[],waris:[],dok:[],hubungi:[],
+var DEF={nama:'',alamat:'',defPenama:true,semak:'',wasiat:'belum',hide:false,harta:[],hutang:[],waris:[],dok:[],lokasi:[],hubungi:[],
  faraid:{jantina:'L',pasangan:1,bapa:0,ibu:0,lelaki:0,perempuan:0,wasiat:0},
  jana:{tipe:1,s1:1,s2:1,s3:1,s4:1,amt:0}};
 var S=load();
@@ -152,6 +152,14 @@ function nomRes(h){
 }
 function hasNom(h){return!!nomRes(h)}
 function nomText(h){var r=nomRes(h);return r?r.t:'Penama belum diisi'}
+function lokOf(id){return id?S.lokasi.filter(function(l){return l.id===id})[0]:null}
+function lokTxt(id,withHint){var l=lokOf(id);return l?(l.nama+(withHint&&l.petunjuk?' (petunjuk: '+l.petunjuk+')':'')):''}
+function lokSmall(x){var l=lokOf(x.lokId);return l?'<small>Dokumen: '+esc(l.nama)+'</small>':''}
+function lokSelect(v){
+ var h='<select id="f_lokId"><option value="">Belum dipilih</option>';
+ S.lokasi.forEach(function(l){h+='<option value="'+l.id+'"'+(v===l.id?' selected':'')+'>'+esc(l.nama)+'</option>'});
+ return h+'</select>'+(S.lokasi.length?'':'<div class="muted" style="margin-top:6px">Belum ada lokasi. Tambah di tab Lagi, bahagian Lokasi penyimpanan dokumen.</div>')
+}
 function penSelect(v){
  var d=defNom(),cur=v||'def',h='<select id="f_penamaId"><option value="def"'+(cur==='def'?' selected':'')+'>'+(d?'Ikut default: '+esc(d.u)+(d.g?' · Ganti: '+esc(d.g):''):'Ikut default (belum ada penama, tambah di tab Waris)')+'</option>';
  S.waris.forEach(function(w){h+='<option value="'+w.id+'"'+(cur===w.id?' selected':'')+'>'+esc(w.nama)+(w.hubungan?' ('+esc(w.hubungan)+')':'')+'</option>'});
@@ -218,7 +226,7 @@ function model(type,o){
    var k=katOf(kid),it=S.harta.filter(function(h){return h.kat===kid});
    if(!it.length)return;
    secs.push({h:k.n,rows:it.map(function(h){
-    var sub=[];if(k.nom||h.nominee)sub.push(nomText(h));if(h.nota)sub.push(h.nota);
+    var sub=[];if(k.nom||h.nominee)sub.push(nomText(h));if(lokOf(h.lokId))sub.push('Dokumen: '+lokTxt(h.lokId,true));if(h.nota)sub.push(h.nota);
     return{a:h.nama,b:(showAmt&&!k.noval)?rm(num(h.jumlah)):'',sub:sub.join(' · ')}
    })})
   });
@@ -229,7 +237,8 @@ function model(type,o){
   if(S.waris.length)secs.push({h:'Waris, penama dan wasi',rows:S.waris.map(function(w){var x=[],u=warisUmur(w);if(w.pn==='utama')x.push('Penama');if(w.pn==='ganti')x.push('Penama ganti');if(w.wasi)x.push('Wasi');if(u!==null&&u<18)x.push('Umur '+u);if(w.tel)x.push(w.tel);return{a:w.nama,b:w.hubungan||'',sub:x.join(' · ')}})});
  }
  if(type===1){
-  if(S.dok.length)secs.push({h:'Dokumen penting',rows:S.dok.map(function(d){return{a:d.nama,b:'',sub:d.lokasi||''}})});
+  if(S.dok.length)secs.push({h:'Dokumen penting',rows:S.dok.map(function(d){return{a:d.nama,b:'',sub:[lokTxt(d.lokId,true),d.lokasi].filter(Boolean).join(' · ')}})});
+  if(S.lokasi.length)secs.push({h:'Lokasi penyimpanan dokumen',rows:S.lokasi.map(function(l){return{a:l.nama,b:l.jenis||'',sub:[l.catatan,l.petunjuk?'Petunjuk kata laluan: '+l.petunjuk:''].filter(Boolean).join(' · ')}})});
   if(S.hubungi.length)secs.push({h:'Hubungi dahulu',rows:S.hubungi.map(function(d){return{a:d.nama,b:d.tel||'',sub:d.peranan||''}})});
  }
  if(type===3){
@@ -274,18 +283,20 @@ function modelText(m){
 }
 
 var FIELDS={
- harta:[{k:'kat',l:'Kategori',t:'kat'},{k:'nama',l:'Nama harta',ph:'Contoh: Rumah Batu Gajah'},{k:'jumlah',l:'Anggaran nilai (RM)',t:'num'},{k:'penamaId',l:'Penama',t:'pen'},{k:'nota',l:'Nota atau lokasi dokumen',ph:'Contoh: geran dalam fail biru'}],
+ harta:[{k:'kat',l:'Kategori',t:'kat'},{k:'nama',l:'Nama harta',ph:'Contoh: Rumah Batu Gajah'},{k:'jumlah',l:'Anggaran nilai (RM)',t:'num'},{k:'penamaId',l:'Penama',t:'pen'},{k:'lokId',l:'Dokumen disimpan di',t:'lok'},{k:'nota',l:'Catatan',ph:'Contoh: geran dalam fail biru'}],
  hutang:[{k:'nama',l:'Nama hutang',ph:'Contoh: Loan rumah'},{k:'jumlah',l:'Baki hutang (RM)',t:'num'},{k:'nota',l:'Nota',ph:''}],
  waris:[{k:'nama',l:'Nama penuh (ikut IC)'},{k:'hubungan',l:'Hubungan',t:'sel',o:['Isteri','Suami','Anak lelaki','Anak perempuan','Bapa','Ibu','Abang / adik','Lain-lain']},{k:'tel',l:'No. telefon',t:'tel'},{k:'ic',l:'No. IC (pilihan, untuk kira umur anak)',t:'ic'},{k:'sa',l:'Guna alamat keluarga',t:'chk'},{k:'ad',l:'Alamat lain',t:'area'},{k:'pn',l:'Peranan penama',t:'sel2',o:[['','Bukan penama'],['utama','Penama utama'],['ganti','Penama ganti']]},{k:'wasi',l:'Wasi',t:'chk'},{k:'w',l:'Waris faraid',t:'chk'}],
- dok:[{k:'nama',l:'Dokumen',ph:'Contoh: Geran rumah'},{k:'lokasi',l:'Disimpan di mana',ph:''}],
+ dok:[{k:'nama',l:'Dokumen',ph:'Contoh: Geran rumah'},{k:'lokId',l:'Disimpan di',t:'lok'},{k:'lokasi',l:'Catatan',ph:'Contoh: folder Harta, geran-rumah.pdf'}],
+ lokasi:[{k:'nama',l:'Nama lokasi',ph:'Contoh: Google Drive'},{k:'jenis',l:'Jenis',t:'sel',o:['Digital','Fizikal']},{k:'idakaun',l:'ID akaun atau emel (pilihan)',ph:'Contoh: nama@gmail.com',t:'dig'},{k:'petunjuk',l:'Petunjuk kata laluan (pilihan)',ph:'Contoh: ada dalam buku nota biru',t:'dig'},{k:'catatan',l:'Catatan akses',ph:'Contoh: folder Wasiat, kongsi dengan isteri'}],
  hubungi:[{k:'nama',l:'Nama',ph:'Contoh: Amanah Raya'},{k:'tel',l:'No. telefon'},{k:'peranan',l:'Peranan',ph:'Contoh: urusan wasiat'}]
 };
-var LIST={harta:'harta',hutang:'hutang',waris:'waris',dok:'dok',hubungi:'hubungi'};
+var LIST={harta:'harta',hutang:'hutang',waris:'waris',dok:'dok',lokasi:'lokasi',hubungi:'hubungi'};
 var cur=null;
 function fieldHtml(f,v){
  if(f.t==='chk')return'<div class="chk"><span>'+f.l+'</span><input type="checkbox" id="f_'+f.k+'"'+(v?' checked':'')+'></div>';
  var h='<div id="w_'+f.k+'"><label>'+f.l+'</label>';
  if(f.t==='kat')h+='<select id="f_'+f.k+'">'+KAT.map(function(k){return'<option value="'+k.id+'"'+(k.id===v?' selected':'')+'>'+k.n+'</option>'}).join('')+'</select>';
+ else if(f.t==='lok')h+=lokSelect(v);
  else if(f.t==='pen')h+=penSelect(v);
  else if(f.t==='sel')h+='<select id="f_'+f.k+'">'+f.o.map(function(o){return'<option'+(o===v?' selected':'')+'>'+o+'</option>'}).join('')+'</select>';
  else if(f.t==='sel2')h+='<select id="f_'+f.k+'">'+f.o.map(function(o){return'<option value="'+o[0]+'"'+(o[0]===v?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select>';
@@ -306,7 +317,7 @@ function openForm(type,id,kat){
  h+='<div class="row" style="margin-top:16px">'+(id?'<button class="btn red" data-act="del">Padam</button>':'')+'<button class="btn o" data-act="close">Batal</button><button class="btn" data-act="saveForm">Simpan</button></div>';
  document.getElementById('sheetIn').innerHTML=h;
  document.getElementById('sheet').classList.add('on');
- if(type==='waris')wireWaris(!id);else if(type==='harta')wireHarta()
+ if(type==='waris')wireWaris(!id);else if(type==='harta')wireHarta();else if(type==='lokasi')wireLokasi()
 }
 function wireWaris(isNew){
  var hb=document.getElementById('f_hubungan'),sa=document.getElementById('f_sa');
@@ -319,6 +330,11 @@ function wireWaris(isNew){
   document.getElementById('f_wasi').checked=(pas||v==='Abang / adik');
   sa.checked=(v!=='Abang / adik');adr()
  }
+}
+function wireLokasi(){
+ var j=document.getElementById('f_jenis');
+ function upd(){var dig=j.value==='Digital';document.getElementById('w_idakaun').style.display=dig?'':'none';document.getElementById('w_petunjuk').style.display=dig?'':'none'}
+ j.onchange=upd;upd()
 }
 function wireHarta(){
  var kat=document.getElementById('f_kat'),pw=document.getElementById('w_penamaId'),nm=document.getElementById('f_nama');
@@ -342,6 +358,7 @@ function saveForm(){
   if(o.ic){if(!icInfo(o.ic)){alert('No. IC tidak sah. Isi 12 digit tanpa sengkang.');return}o.ic=o.ic.replace(/\D/g,'')}
   if(o.sa)o.ad=''
  }
+ if(cur.type==='lokasi'&&o.jenis==='Fizikal'){o.idakaun='';o.petunjuk=''}
  if(cur.type==='harta'){o.kemaskini=todayISO();o.nominee='';if(!katOf(o.kat).nom||o.penamaId==='def')o.penamaId=''}
  if(cur.id){var it=list.filter(function(x){return x.id===cur.id})[0];Object.assign(it,o)}
  else{o.id=uid();list.push(o)}
@@ -368,7 +385,7 @@ function vHarta(){
  KAT.forEach(function(k){
   var it=S.harta.filter(function(x){return x.kat===k.id}),s=sumKat(k.id);
   h+='<div class="cat'+(openCat[k.id]?' open':'')+'"><div class="hd" data-act="cat" data-id="'+k.id+'"><div class="ic">'+k.n.charAt(0)+'</div><div class="nm"><p>'+k.n+'</p><span>'+(it.length?it.length+' item':k.s)+'</span></div><div class="amt">'+(k.noval?(it.length?'-':''):money(s))+'</div></div><div class="items">';
-  it.forEach(function(x){h+='<div class="it"><div class="l" data-act="edit" data-t="harta" data-id="'+x.id+'">'+esc(x.nama)+tagFor(x,k)+(x.nota?'<small>'+esc(x.nota)+'</small>':'')+thNote(x,k)+'</div><div>'+(k.noval?'':money(num(x.jumlah)))+'</div></div>'});
+  it.forEach(function(x){h+='<div class="it"><div class="l" data-act="edit" data-t="harta" data-id="'+x.id+'">'+esc(x.nama)+tagFor(x,k)+(x.nota?'<small>'+esc(x.nota)+'</small>':'')+thNote(x,k)+lokSmall(x)+'</div><div>'+(k.noval?'':money(num(x.jumlah)))+'</div></div>'});
   h+='<button class="btn o sm add" data-act="add" data-t="harta" data-k="'+k.id+'">+ Tambah di sini</button></div></div>'
  });
  h+='<div class="cat'+(openCat.hutang?' open':'')+'"><div class="hd" data-act="cat" data-id="hutang"><div class="ic">H</div><div class="nm"><p>Hutang</p><span>Ditolak daripada harta</span></div><div class="amt" style="color:var(--red)">'+(t.debt?'- ':'')+money(t.debt)+'</div></div><div class="items">';
@@ -433,13 +450,16 @@ function vLagi(){
  var h='<h2>Nama anda</h2><div class="card"><input id="nama" type="text" value="'+esc(S.nama)+'" placeholder="Nama penuh untuk dokumen"></div>';
  h+='<h2>Status wasiat</h2><div class="card"><select id="wasiat">'+['belum','sedang','sudah'].map(function(k){return'<option value="'+k+'"'+((S.wasiat||'belum')===k?' selected':'')+'>'+WS[k]+'</option>'}).join('')+'</select><div class="muted" style="margin-top:6px">Wasiat rasmi disediakan melalui Amanah Raya, peguam syarie atau pejabat agama.</div></div>';
  h+='<h2>Peringatan semakan tahunan</h2><div class="card"><label style="margin-top:0">Tarikh semak seterusnya</label><input id="semakTgl" type="date" value="'+esc(S.semak)+'"></div>';
+ h+='<h2>Lokasi penyimpanan dokumen</h2>';
+ S.lokasi.forEach(function(l){h+='<div class="card" style="padding:10px 14px" data-act="edit" data-t="lokasi" data-id="'+l.id+'"><b>'+esc(l.nama)+'</b><span class="tag" style="background:var(--soft);color:var(--pri-d)">'+esc(l.jenis||'')+'</span><div class="muted">'+(l.idakaun?'ID: '+esc(l.idakaun)+'<br>':'')+(l.petunjuk?'Petunjuk: '+esc(l.petunjuk)+'<br>':'')+esc(l.catatan||'')+'</div></div>'});
+ h+='<div class="muted" style="margin:0 0 8px">ID akaun dan petunjuk tidak dimasukkan dalam dokumen yang dikongsi.</div><button class="btn o add" data-act="add" data-t="lokasi">+ Tambah lokasi</button>';
  h+='<h2>Dokumen penting</h2>';
- S.dok.forEach(function(d){h+='<div class="card" style="padding:10px 14px" data-act="edit" data-t="dok" data-id="'+d.id+'"><b>'+esc(d.nama)+'</b><div class="muted">'+esc(d.lokasi)+'</div></div>'});
+ S.dok.forEach(function(d){h+='<div class="card" style="padding:10px 14px" data-act="edit" data-t="dok" data-id="'+d.id+'"><b>'+esc(d.nama)+'</b><div class="muted">'+esc([lokTxt(d.lokId),d.lokasi].filter(Boolean).join(' · '))+'</div></div>'});
  h+='<button class="btn o add" data-act="add" data-t="dok">+ Tambah dokumen</button>';
  h+='<h2>Hubungi dahulu</h2>';
  S.hubungi.forEach(function(d){h+='<div class="card" style="padding:10px 14px" data-act="edit" data-t="hubungi" data-id="'+d.id+'"><b>'+esc(d.nama)+'</b> <span class="muted">'+esc(d.tel)+'</span><div class="muted">'+esc(d.peranan)+'</div></div>'});
  h+='<button class="btn o add" data-act="add" data-t="hubungi">+ Tambah orang untuk dihubungi</button>';
- h+='<h2>Simpanan data</h2><div class="card"><div class="muted" style="margin-bottom:8px">Data disimpan dalam peranti ini sahaja. Buat sandaran (backup) selalu, terutama sebelum tukar telefon atau padam data pelayar. Fail sandaran mengandungi no. IC dan alamat, jadi simpan di tempat selamat.</div><div class="row"><button class="btn" data-act="export">Sandaran</button><button class="btn o" data-act="import">Pulihkan</button></div><input id="impFile" type="file" accept="application/json" style="display:none"><button class="btn red add" data-act="wipe">Padam semua data</button></div>';
+ h+='<h2>Simpanan data</h2><div class="card"><div class="muted" style="margin-bottom:8px">Data disimpan dalam peranti ini sahaja. Buat sandaran (backup) selalu, terutama sebelum tukar telefon atau padam data pelayar. Fail sandaran mengandungi no. IC, alamat dan ID akaun, jadi simpan di tempat selamat.</div><div class="row"><button class="btn" data-act="export">Sandaran</button><button class="btn o" data-act="import">Pulihkan</button></div><input id="impFile" type="file" accept="application/json" style="display:none"><button class="btn red add" data-act="wipe">Padam semua data</button></div>';
  h+='<h2>Install app</h2><div class="card"><div class="muted" style="margin-bottom:8px" id="instTxt">Pasang MyWarisan di skrin utama supaya boleh dibuka seperti app biasa dan berfungsi tanpa internet.</div><button class="btn" data-act="install">Install app</button></div>';
  h+='<div class="muted" style="margin-top:12px">MyWarisan membantu menyusun senarai harta dan anggaran faraid. Ia bukan nasihat undang-undang dan bukan wasiat yang sah. Rujuk Amanah Raya, peguam syarie atau pejabat agama untuk dokumen rasmi.</div>';
  return h
