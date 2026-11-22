@@ -106,7 +106,7 @@ td:last-child,th:last-child{text-align:right}
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
 <div id="printArea"></div>
 <script>
-var APP={nama:'MyWarisan',ver:'0.4',tarikh:'22 Nov 2026',tahun:2026};
+var APP={nama:'MyWarisan',ver:'0.5',tarikh:'22 Nov 2026',tahun:2026};
 var KEY='mywarisan_v1';
 var KAT=[
  {id:'hartanah',n:'Hartanah',s:'Rumah, tanah'},
@@ -182,10 +182,28 @@ function rm(n){return 'RM '+(Math.round(n*100)/100).toLocaleString('en-MY',{mini
 function money(n){return S.hide?'RM ••••':rm(n)}
 function katOf(id){return KAT.filter(function(k){return k.id===id})[0]}
 function sumKat(id){return S.harta.filter(function(h){return h.kat===id}).reduce(function(a,h){return a+num(h.jumlah)},0)}
+function covInfo(h){
+ var tk=h.takId?S.harta.filter(function(x){return x.id===h.takId})[0]:null;
+ if(!tk)return{cov:0,baki:num(h.jumlah),nm:'',full:false,on:false};
+ var j=num(h.jumlah),c=h.lindung==='sebahagian'?Math.min(j,Math.max(0,num(h.lindungAmt))):j;
+ return{cov:c,baki:j-c,nm:tk.nama,full:c>=j&&j>0,on:true}
+}
+function covText(h){
+ var c=covInfo(h);if(!c.on)return'';
+ return c.baki>0?'Dilindungi takaful '+rm(c.cov)+' ('+c.nm+'). Baki '+rm(c.baki)+' belum dilindungi':'Diselesaikan takaful ('+c.nm+')'
+}
+function takSelect(v){
+ var tk=S.harta.filter(function(x){return x.kat==='takaful'});
+ var h='<select id="f_takId"><option value="">Tiada perlindungan</option>';
+ tk.forEach(function(x){h+='<option value="'+x.id+'"'+(v===x.id?' selected':'')+'>'+esc(x.nama)+'</option>'});
+ return h+'</select><div class="muted" style="margin-top:6px">'+(tk.length?'Pilih takaful yang dah dimasukkan di kategori Takaful. Jumlah MRTA tak perlu dimasukkan sebagai harta kerana dibayar terus kepada bank.':'Belum ada takaful. Tambah dahulu di kategori Takaful (isi jumlah 0 untuk MRTA), kemudian pilih di sini.')+'</div>'
+}
 function totals(){
  var tot=0;KAT.forEach(function(k){if(!k.noval)tot+=sumKat(k.id)});
- var d=S.hutang.reduce(function(a,h){return a+num(h.jumlah)},0);
- return{tot:tot,debt:d,net:tot-d}
+ var g=S.hutang.reduce(function(a,h){return a+num(h.jumlah)},0);
+ var c=S.hutang.reduce(function(a,h){return a+covInfo(h).cov},0);
+ var d=g-c;
+ return{tot:tot,debt:d,gross:g,cov:c,net:tot-d}
 }
 
 function faraidKira(o,estate){
@@ -230,9 +248,9 @@ function model(type,o){
     return{a:h.nama,b:(showAmt&&!k.noval)?rm(num(h.jumlah)):'',sub:sub.join(' · ')}
    })})
   });
-  if(s==='s4'&&S.hutang.length)secs.push({h:'Hutang',rows:S.hutang.map(function(h){return{a:h.nama,b:showAmt?rm(num(h.jumlah)):'',sub:h.nota||''}})})
+  if(s==='s4'&&S.hutang.length)secs.push({h:'Hutang',rows:S.hutang.map(function(h){return{a:h.nama,b:showAmt?rm(num(h.jumlah)):'',sub:[covText(h),h.nota].filter(Boolean).join(' · ')}})})
  });
- if(showAmt){totl.push(['Jumlah harta',rm(t.tot)]);totl.push(['Hutang',rm(t.debt)]);totl.push(['Harta bersih (anggaran)',rm(t.net)])}
+ if(showAmt){totl.push(['Jumlah harta',rm(t.tot)]);totl.push(['Hutang (selepas takaful)',rm(t.debt)]);if(t.cov)totl.push(['Hutang ditanggung takaful',rm(t.cov)]);totl.push(['Harta bersih (anggaran)',rm(t.net)])}
  if(type!==2){
   if(S.waris.length)secs.push({h:'Waris, penama dan wasi',rows:S.waris.map(function(w){var x=[],u=warisUmur(w);if(w.pn==='utama')x.push('Penama');if(w.pn==='ganti')x.push('Penama ganti');if(w.wasi)x.push('Wasi');if(u!==null&&u<18)x.push('Umur '+u);if(w.tel)x.push(w.tel);return{a:w.nama,b:w.hubungan||'',sub:x.join(' · ')}})});
  }
@@ -284,7 +302,7 @@ function modelText(m){
 
 var FIELDS={
  harta:[{k:'kat',l:'Kategori',t:'kat'},{k:'nama',l:'Nama harta',ph:'Contoh: Rumah Batu Gajah'},{k:'jumlah',l:'Anggaran nilai (RM)',t:'num'},{k:'penamaId',l:'Penama',t:'pen'},{k:'lokId',l:'Dokumen disimpan di',t:'lok'},{k:'nota',l:'Catatan',ph:'Contoh: geran dalam fail biru'}],
- hutang:[{k:'nama',l:'Nama hutang',ph:'Contoh: Loan rumah'},{k:'jumlah',l:'Baki hutang (RM)',t:'num'},{k:'nota',l:'Nota',ph:''}],
+ hutang:[{k:'nama',l:'Nama hutang',ph:'Contoh: Loan rumah'},{k:'jumlah',l:'Baki hutang (RM)',t:'num'},{k:'takId',l:'Dilindungi oleh',t:'tak'},{k:'lindung',l:'Jumlah dilindungi',t:'sel2',o:[['penuh','Penuh (baki hutang diselesaikan)'],['sebahagian','Sebahagian']]},{k:'lindungAmt',l:'Jumlah dilindungi (RM)',t:'num'},{k:'nota',l:'Nota',ph:''}],
  waris:[{k:'nama',l:'Nama penuh (ikut IC)'},{k:'hubungan',l:'Hubungan',t:'sel',o:['Isteri','Suami','Anak lelaki','Anak perempuan','Bapa','Ibu','Abang / adik','Lain-lain']},{k:'tel',l:'No. telefon',t:'tel'},{k:'ic',l:'No. IC (pilihan, untuk kira umur anak)',t:'ic'},{k:'sa',l:'Guna alamat keluarga',t:'chk'},{k:'ad',l:'Alamat lain',t:'area'},{k:'pn',l:'Peranan penama',t:'sel2',o:[['','Bukan penama'],['utama','Penama utama'],['ganti','Penama ganti']]},{k:'wasi',l:'Wasi',t:'chk'},{k:'w',l:'Waris faraid',t:'chk'}],
  dok:[{k:'nama',l:'Dokumen',ph:'Contoh: Geran rumah'},{k:'lokId',l:'Disimpan di',t:'lok'},{k:'lokasi',l:'Catatan',ph:'Contoh: folder Harta, geran-rumah.pdf'}],
  lokasi:[{k:'nama',l:'Nama lokasi',ph:'Contoh: Google Drive'},{k:'jenis',l:'Jenis',t:'sel',o:['Digital','Fizikal']},{k:'idakaun',l:'ID akaun atau emel (pilihan)',ph:'Contoh: nama@gmail.com',t:'dig'},{k:'petunjuk',l:'Petunjuk kata laluan (pilihan)',ph:'Contoh: ada dalam buku nota biru',t:'dig'},{k:'catatan',l:'Catatan akses',ph:'Contoh: folder Wasiat, kongsi dengan isteri'}],
@@ -297,6 +315,7 @@ function fieldHtml(f,v){
  var h='<div id="w_'+f.k+'"><label>'+f.l+'</label>';
  if(f.t==='kat')h+='<select id="f_'+f.k+'">'+KAT.map(function(k){return'<option value="'+k.id+'"'+(k.id===v?' selected':'')+'>'+k.n+'</option>'}).join('')+'</select>';
  else if(f.t==='lok')h+=lokSelect(v);
+ else if(f.t==='tak')h+=takSelect(v);
  else if(f.t==='pen')h+=penSelect(v);
  else if(f.t==='sel')h+='<select id="f_'+f.k+'">'+f.o.map(function(o){return'<option'+(o===v?' selected':'')+'>'+o+'</option>'}).join('')+'</select>';
  else if(f.t==='sel2')h+='<select id="f_'+f.k+'">'+f.o.map(function(o){return'<option value="'+o[0]+'"'+(o[0]===v?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select>';
@@ -317,7 +336,7 @@ function openForm(type,id,kat){
  h+='<div class="row" style="margin-top:16px">'+(id?'<button class="btn red" data-act="del">Padam</button>':'')+'<button class="btn o" data-act="close">Batal</button><button class="btn" data-act="saveForm">Simpan</button></div>';
  document.getElementById('sheetIn').innerHTML=h;
  document.getElementById('sheet').classList.add('on');
- if(type==='waris')wireWaris(!id);else if(type==='harta')wireHarta();else if(type==='lokasi')wireLokasi()
+ if(type==='waris')wireWaris(!id);else if(type==='harta')wireHarta();else if(type==='lokasi')wireLokasi();else if(type==='hutang')wireHutang()
 }
 function wireWaris(isNew){
  var hb=document.getElementById('f_hubungan'),sa=document.getElementById('f_sa');
@@ -330,6 +349,11 @@ function wireWaris(isNew){
   document.getElementById('f_wasi').checked=(pas||v==='Abang / adik');
   sa.checked=(v!=='Abang / adik');adr()
  }
+}
+function wireHutang(){
+ var t=document.getElementById('f_takId'),l=document.getElementById('f_lindung'),a=document.getElementById('f_lindungAmt');
+ function upd(){var on=!!t.value;document.getElementById('w_lindung').style.display=on?'':'none';document.getElementById('w_lindungAmt').style.display=(on&&l.value==='sebahagian')?'':'none'}
+ t.onchange=upd;l.onchange=upd;upd()
 }
 function wireLokasi(){
  var j=document.getElementById('f_jenis');
@@ -359,6 +383,7 @@ function saveForm(){
   if(o.sa)o.ad=''
  }
  if(cur.type==='lokasi'&&o.jenis==='Fizikal'){o.idakaun='';o.petunjuk=''}
+ if(cur.type==='hutang'){if(!o.takId){o.lindung='';o.lindungAmt=''}else{if(!o.lindung)o.lindung='penuh';if(o.lindung!=='sebahagian')o.lindungAmt=''}}
  if(cur.type==='harta'){o.kemaskini=todayISO();o.nominee='';if(!katOf(o.kat).nom||o.penamaId==='def')o.penamaId=''}
  if(cur.id){var it=list.filter(function(x){return x.id===cur.id})[0];Object.assign(it,o)}
  else{o.id=uid();list.push(o)}
@@ -379,7 +404,7 @@ function tagFor(h,k){
 }
 function vHarta(){
  var t=totals(),w=wasiatInfo(),h='';
- h+='<div class="card"><div class="muted">Harta bersih (anggaran)</div><div class="big">'+money(t.net)+'</div><div class="grid2"><div class="mini"><span class="muted">Jumlah harta</span><b>'+money(t.tot)+'</b></div><div class="mini"><span class="muted">Hutang</span><b>'+money(t.debt)+'</b></div></div><div class="muted" style="margin-top:10px">Had wasiat (1/3): <b style="color:var(--tx)">'+money(w.maks)+'</b></div><div class="muted" style="margin-top:4px">Status wasiat: <b style="color:var(--tx)">'+(WS[S.wasiat]||WS.belum)+'</b></div></div>';
+ h+='<div class="card"><div class="muted">Harta bersih (anggaran)</div><div class="big">'+money(t.net)+'</div><div class="grid2"><div class="mini"><span class="muted">Jumlah harta</span><b>'+money(t.tot)+'</b></div><div class="mini"><span class="muted">Hutang</span><b>'+money(t.debt)+'</b></div></div>'+(t.cov?'<div class="muted" style="margin-top:10px">Hutang ditanggung takaful: <b style="color:var(--tx)">'+money(t.cov)+'</b></div>':'')+'<div class="muted" style="margin-top:10px">Had wasiat (1/3): <b style="color:var(--tx)">'+money(w.maks)+'</b></div><div class="muted" style="margin-top:4px">Status wasiat: <b style="color:var(--tx)">'+(WS[S.wasiat]||WS.belum)+'</b></div></div>';
  if(S.semak&&todayISO()>=S.semak)h+='<div class="card" style="background:var(--accsoft);color:var(--accd)"><b>Masa semak semula</b><div style="font-size:13px;margin:2px 0 8px">Kemas kini nilai harta, baki dan penama. Tarikh semakan: '+fmtDate(new Date(S.semak+'T00:00:00'))+'</div><button class="btn sm" data-act="semakDone">Dah semak</button></div>';
  h+='<div class="row" style="margin-bottom:10px"><button class="btn" data-act="add" data-t="harta">+ Tambah harta</button><button class="btn o" data-act="toggleHide">'+(S.hide?'Tunjuk jumlah':'Sorok jumlah')+'</button></div>';
  KAT.forEach(function(k){
@@ -388,8 +413,8 @@ function vHarta(){
   it.forEach(function(x){h+='<div class="it"><div class="l" data-act="edit" data-t="harta" data-id="'+x.id+'">'+esc(x.nama)+tagFor(x,k)+(x.nota?'<small>'+esc(x.nota)+'</small>':'')+thNote(x,k)+lokSmall(x)+'</div><div>'+(k.noval?'':money(num(x.jumlah)))+'</div></div>'});
   h+='<button class="btn o sm add" data-act="add" data-t="harta" data-k="'+k.id+'">+ Tambah di sini</button></div></div>'
  });
- h+='<div class="cat'+(openCat.hutang?' open':'')+'"><div class="hd" data-act="cat" data-id="hutang"><div class="ic">H</div><div class="nm"><p>Hutang</p><span>Ditolak daripada harta</span></div><div class="amt" style="color:var(--red)">'+(t.debt?'- ':'')+money(t.debt)+'</div></div><div class="items">';
- S.hutang.forEach(function(x){h+='<div class="it"><div class="l" data-act="edit" data-t="hutang" data-id="'+x.id+'">'+esc(x.nama)+(x.nota?'<small>'+esc(x.nota)+'</small>':'')+'</div><div>'+money(num(x.jumlah))+'</div></div>'});
+ h+='<div class="cat'+(openCat.hutang?' open':'')+'"><div class="hd" data-act="cat" data-id="hutang"><div class="ic">H</div><div class="nm"><p>Hutang</p><span>Ditolak daripada harta (selepas takaful)</span></div><div class="amt" style="color:var(--red)">'+(t.debt?'- ':'')+money(t.debt)+'</div></div><div class="items">';
+ S.hutang.forEach(function(x){var c=covInfo(x),tg=c.on?(c.baki>0?'<span class="tag red">Baki '+money(c.baki)+' belum dilindungi</span>':'<span class="tag" style="background:var(--soft);color:var(--pri-d)">Diselesaikan takaful</span>'):'';h+='<div class="it"><div class="l" data-act="edit" data-t="hutang" data-id="'+x.id+'">'+esc(x.nama)+tg+(c.on?'<small>'+esc(c.nm)+'</small>':'')+(x.nota?'<small>'+esc(x.nota)+'</small>':'')+'</div><div>'+money(num(x.jumlah))+'</div></div>'});
  h+='<button class="btn o sm add" data-act="add" data-t="hutang">+ Tambah hutang</button></div></div>';
  return h
 }
