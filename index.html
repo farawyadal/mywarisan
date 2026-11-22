@@ -106,7 +106,7 @@ td:last-child,th:last-child{text-align:right}
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
 <div id="printArea"></div>
 <script>
-var APP={nama:'MyWarisan',ver:'0.6',tarikh:'22 Nov 2026',tahun:2026};
+var APP={nama:'MyWarisan',ver:'0.7',tarikh:'22 Nov 2026',tahun:2026};
 var KEY='mywarisan_v1';
 var insToggleFn=null;
 var KAT=[
@@ -121,7 +121,7 @@ var KAT=[
 ];
 var GRP={s1:['hartanah','kenderaan','lain'],s2:['bank','simpanan','takaful'],s3:['khairat'],s4:['piutang']};
 var GLBL={s1:'Hartanah, kenderaan, lain-lain',s2:'Bank, simpanan, takaful',s3:'Khairat kematian',s4:'Hutang dan piutang'};
-var DEF={nama:'',alamat:'',defPenama:true,semak:'',wasiat:'belum',hide:false,harta:[],hutang:[],waris:[],dok:[],lokasi:[],hubungi:[],
+var DEF={nama:'',alamat:'',defPenama:true,semak:'',wasiat:'belum',hide:false,harta:[],hutang:[],waris:[],dok:[],lokasi:[],hubungi:[],bajetAbaikan:[],
  faraid:{jantina:'L',pasangan:1,bapa:0,ibu:0,lelaki:0,perempuan:0,wasiat:0},
  jana:{tipe:1,s1:1,s2:1,s3:1,s4:1,amt:0}};
 var S=load();
@@ -406,6 +406,101 @@ function saveForm(){
  if(cur.type==='harta')openCat[o.kat]=1;
  save();closeSheet();render()
 }
+var BJ={cid:'955576045843-541si1cs87t9apl0r5muk5nui00obps1.apps.googleusercontent.com',skop:'https://www.googleapis.com/auth/drive.appdata',tok:null,exp:0,st:null};
+function bjSheet(h){document.getElementById('sheetIn').innerHTML=h;document.getElementById('sheet').classList.add('on')}
+function bjMsg(t,m){bjSheet('<h3>'+t+'</h3><div class="muted" style="margin:8px 0 16px">'+m+'</div><div class="row"><button class="btn" data-act="close">Tutup</button></div>')}
+function bjGsi(){
+ return new Promise(function(ok,no){
+  if(window.google&&window.google.accounts&&window.google.accounts.oauth2)return ok();
+  var sc=document.createElement('script');sc.src='https://accounts.google.com/gsi/client';sc.onload=function(){ok()};sc.onerror=function(){no(new Error('gsi'))};document.head.appendChild(sc)
+ })
+}
+function bjToken(){
+ return bjGsi().then(function(){
+  if(BJ.tok&&BJ.exp>Date.now()+60000)return BJ.tok;
+  return new Promise(function(ok,no){
+   var c=window.google.accounts.oauth2.initTokenClient({client_id:BJ.cid,scope:BJ.skop,
+    callback:function(r){if(r&&r.access_token){BJ.tok=r.access_token;BJ.exp=Date.now()+(r.expires_in||3600)*1000;ok(BJ.tok)}else no(new Error('auth'))},
+    error_callback:function(){no(new Error('auth'))}});
+   c.requestAccessToken({})
+  })
+ })
+}
+function bjBaca(tok){
+ var H={headers:{Authorization:'Bearer '+tok}};
+ return fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&q='+encodeURIComponent("name='mybajet.json'"),H)
+  .then(function(r){if(!r.ok)throw new Error('http'+r.status);return r.json()})
+  .then(function(j){
+   if(!j.files||!j.files[0])throw new Error('tiada');
+   return fetch('https://www.googleapis.com/drive/v3/files/'+j.files[0].id+'?alt=media',H)
+  })
+  .then(function(r){if(!r.ok)throw new Error('http'+r.status);return r.json()})
+}
+function bjKira(d){
+ var sen=function(x){return Math.round((Number(x)||0)*100)};
+ var kunci=Object.keys(d.sheets||{});
+ return (d.hutang||[]).filter(function(h){return h&&h.id}).map(function(h){
+  var bayar=0;
+  kunci.forEach(function(k){((d.sheets[k]||{}).items||[]).forEach(function(i){
+   var a=i.hutang===h.id?sen(i.amount):(i.pecahan&&i.pecahan[h.id]?sen(i.pecahan[h.id]):0);
+   if(a>0&&(h.arah==='keluar'?!!i.paid:true))bayar+=a
+  })});
+  return{bid:h.id,arah:h.arah==='keluar'?'keluar':'masuk',nama:String(h.nama||'Tanpa nama').trim().slice(0,60),baki:Math.max(0,sen(h.jumlah)-bayar)/100}
+ })
+}
+function bjFind(it){
+ var list=it.arah==='keluar'?S.hutang:S.harta.filter(function(x){return x.kat==='piutang'});
+ return list.filter(function(x){return x.bajetId===it.bid})[0]
+}
+function tarik(){
+ bjSheet('<h3>Tarik dari MyBajet</h3><div style="display:flex;align-items:center;gap:12px;margin:14px 0"><div class="donut" style="width:32px;height:32px;border-width:4px"></div><div class="muted">Menyambung ke Google…</div></div>');
+ bjToken().then(bjBaca).then(function(d){
+  var items=bjKira(d).map(function(it){
+   var ex=bjFind(it);it.ex=ex||null;
+   it.ign=!ex&&S.bajetAbaikan.indexOf(it.bid)>=0;
+   it.def=ex?true:(it.baki>0&&!/sendiri/i.test(it.nama));
+   return it
+  }).filter(function(it){return !(it.ex&&it.ex.arsip)});
+  BJ.st={items:items,showIgn:false};tarikRender()
+ }).catch(function(e){
+  var m=e&&e.message;
+  if(m==='tiada')bjMsg('Data MyBajet tak dijumpai','MyBajet belum disambung ke Google Drive. Buka MyBajet, sambung Google Drive dahulu, kemudian cuba lagi.');
+  else if(m==='auth')bjMsg('Log masuk tak berjaya','Kebenaran Google tak diberi atau tetingkap ditutup. Cuba lagi dan pilih akaun yang sama dengan MyBajet.');
+  else bjMsg('Tak dapat tarik data','Semak sambungan internet, kemudian cuba lagi.')
+ })
+}
+function tarikRender(){
+ var st=BJ.st,h='<h3>Tarik dari MyBajet</h3>';
+ var ig=st.items.filter(function(i){return i.ign}).length;
+ function grup(arah,tt){
+  var l=st.items.filter(function(i){return i.arah===arah&&(st.showIgn||!i.ign)});
+  if(!l.length)return'';
+  var o='<div style="font-weight:500;margin:12px 0 4px">'+tt+'</div>';
+  l.forEach(function(i){var n=st.items.indexOf(i);o+='<div class="chk"><span>'+esc(i.nama)+(i.ex?' <span class="muted">(kemas kini)</span>':'')+'<br><span class="muted">'+rm(i.baki)+(i.baki===0?', dah langsai':'')+'</span></span><input type="checkbox" id="tk_'+n+'"'+((st.showIgn&&i.ign)?'':(i.def?' checked':''))+'></div>'});
+  return o
+ }
+ var a=grup('keluar','Aku berhutang (jadi Hutang)'),b=grup('masuk','Orang berhutang dengan aku (jadi Piutang)');
+ if(!a&&!b)h+='<div class="muted" style="margin:10px 0">Tiada hutang baharu untuk ditarik.</div>';
+ h+=a+b;
+ if(ig&&!st.showIgn)h+='<div style="margin-top:12px"><button class="btn o sm" data-act="tarikIgn">Tunjuk '+ig+' item yang diabaikan</button></div>';
+ h+='<div class="muted" style="margin-top:10px">Item yang tak ditanda (dan masih ada baki) tak ditunjuk lagi pada tarikan seterusnya.</div>';
+ h+='<div class="row" style="margin-top:16px"><button class="btn o" data-act="close">Batal</button><button class="btn" data-act="tarikOk">Tarik item dipilih</button></div>';
+ bjSheet(h)
+}
+function tarikOk(){
+ var st=BJ.st,add=0,upd=0;
+ st.items.forEach(function(it,n){
+  var e=document.getElementById('tk_'+n);if(!e)return;
+  if(e.checked){
+   var ix=S.bajetAbaikan.indexOf(it.bid);if(ix>=0)S.bajetAbaikan.splice(ix,1);
+   if(it.ex){it.ex.jumlah=it.baki;it.ex.bajetTarikh=todayISO();if(it.arah==='masuk')it.ex.kemaskini=todayISO();upd++}
+   else if(it.arah==='keluar'){S.hutang.push({id:uid(),nama:it.nama,jumlah:it.baki,nota:'',bajetId:it.bid,bajetTarikh:todayISO()});add++}
+   else{S.harta.push({id:uid(),kat:'piutang',nama:it.nama,jumlah:it.baki,nota:'',kemaskini:todayISO(),bajetId:it.bid,bajetTarikh:todayISO()});add++}
+  }else if(!it.ex&&it.baki>0&&S.bajetAbaikan.indexOf(it.bid)<0)S.bajetAbaikan.push(it.bid)
+ });
+ save();render();
+ bjMsg('Siap',add+' item ditambah, '+upd+' item dikemas kini. Item yang dah langsai di MyBajet ditanda supaya boleh diarkibkan.')
+}
 function arkibForm(){
  var h_=cur.type==='harta',op=h_?['Dijual','Dihibah','Rosak atau hapus','Lain-lain']:['Dijelaskan','Lain-lain'];
  var h='<h3>Arkibkan item ini</h3><label>Sebab</label><select id="ar_sebab">'+op.map(function(o){return'<option>'+o+'</option>'}).join('')+'</select><label>Tarikh</label><input id="ar_tgl" type="date" value="'+todayISO()+'">';
@@ -445,9 +540,14 @@ function insTags(h){
 function insWarn(){
  return HA().filter(function(h){return h.kat==='kenderaan'&&[h.insTamat,h.jalanTamat].some(function(d){var n=daysTo(d);return n!==null&&n<=30})})
 }
+function bjTag(x){
+ if(!x.bajetId)return'';
+ return'<span class="tag" style="background:var(--soft);color:var(--pri-d)">Dari MyBajet</span>'+(num(x.jumlah)===0?'<span class="tag red">Dah langsai di MyBajet. Arkibkan?</span>':'')
+}
 function tagFor(h,k){
  var t='';
  if(k.nom){var r=nomRes(h);t=r?'<span class="tag" style="background:var(--soft);color:var(--pri-d)">'+esc(r.custom?r.t:'Penama default')+'</span>':'<span class="tag">Nominee?</span>'}
+ t+=bjTag(h);
  if(daysSince(h.kemaskini)>365)t+='<span class="tag">Semak nilai</span>';
  return t
 }
@@ -461,11 +561,11 @@ function vHarta(){
   var it=HA().filter(function(x){return x.kat===k.id}),s=sumKat(k.id);
   h+='<div class="cat'+(openCat[k.id]?' open':'')+'"><div class="hd" data-act="cat" data-id="'+k.id+'"><div class="ic">'+k.n.charAt(0)+'</div><div class="nm"><p>'+k.n+'</p><span>'+(it.length?it.length+' item':k.s)+'</span></div><div class="amt">'+(k.noval?(it.length?'-':''):money(s))+'</div></div><div class="items">';
   it.forEach(function(x){h+='<div class="it"><div class="l" data-act="edit" data-t="harta" data-id="'+x.id+'">'+esc(x.nama)+tagFor(x,k)+insTags(x)+(x.kat==='kenderaan'&&insLine(x)?'<small>'+esc(insLine(x))+'</small>':'')+(x.nota?'<small>'+esc(x.nota)+'</small>':'')+thNote(x,k)+lokSmall(x)+'</div><div>'+(k.noval?'':money(num(x.jumlah)))+'</div></div>'});
-  h+='<button class="btn o sm add" data-act="add" data-t="harta" data-k="'+k.id+'">+ Tambah di sini</button></div></div>'
+  h+='<button class="btn o sm add" data-act="add" data-t="harta" data-k="'+k.id+'">+ Tambah di sini</button>'+(k.id==='piutang'?'<button class="btn o sm add" data-act="tarik">Tarik dari MyBajet</button>':'')+'</div></div>'
  });
  h+='<div class="cat'+(openCat.hutang?' open':'')+'"><div class="hd" data-act="cat" data-id="hutang"><div class="ic">H</div><div class="nm"><p>Hutang</p><span>Ditolak daripada harta (selepas takaful)</span></div><div class="amt" style="color:var(--red)">'+(t.debt?'- ':'')+money(t.debt)+'</div></div><div class="items">';
- HU().forEach(function(x){var c=covInfo(x),tg=c.on?(c.baki>0?'<span class="tag red">Baki '+money(c.baki)+' belum dilindungi</span>':'<span class="tag" style="background:var(--soft);color:var(--pri-d)">Diselesaikan takaful</span>'):'';h+='<div class="it"><div class="l" data-act="edit" data-t="hutang" data-id="'+x.id+'">'+esc(x.nama)+tg+(c.on?'<small>'+esc(c.nm)+'</small>':'')+(x.nota?'<small>'+esc(x.nota)+'</small>':'')+'</div><div>'+money(num(x.jumlah))+'</div></div>'});
- h+='<button class="btn o sm add" data-act="add" data-t="hutang">+ Tambah hutang</button></div></div>';
+ HU().forEach(function(x){var c=covInfo(x),tg=c.on?(c.baki>0?'<span class="tag red">Baki '+money(c.baki)+' belum dilindungi</span>':'<span class="tag" style="background:var(--soft);color:var(--pri-d)">Diselesaikan takaful</span>'):'';h+='<div class="it"><div class="l" data-act="edit" data-t="hutang" data-id="'+x.id+'">'+esc(x.nama)+tg+bjTag(x)+(c.on?'<small>'+esc(c.nm)+'</small>':'')+(x.nota?'<small>'+esc(x.nota)+'</small>':'')+'</div><div>'+money(num(x.jumlah))+'</div></div>'});
+ h+='<button class="btn o sm add" data-act="add" data-t="hutang">+ Tambah hutang</button><button class="btn o sm add" data-act="tarik">Tarik dari MyBajet</button></div></div>';
  return h
 }
 
@@ -610,6 +710,9 @@ document.addEventListener('click',function(e){
  else if(a==='del')delItem()
  else if(a==='insToggle'){if(insToggleFn)insToggleFn()}
  else if(a==='arkib')arkibForm()
+ else if(a==='tarik')tarik()
+ else if(a==='tarikOk')tarikOk()
+ else if(a==='tarikIgn'){BJ.st.showIgn=true;tarikRender()}
  else if(a==='arkibOk')arkibOk()
  else if(a==='pulihCur'){pulih(cur.type,cur.id);closeSheet();render()}
  else if(a==='pulih'){pulih(el.dataset.t,el.dataset.id);render()}
