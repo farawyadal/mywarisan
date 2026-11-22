@@ -1,4 +1,4 @@
-var CACHE = 'mywarisan-v0.1';
+var CACHE = 'mywarisan-v0.2';
 var FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function (e) {
