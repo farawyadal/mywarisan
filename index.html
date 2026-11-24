@@ -106,7 +106,7 @@ td:last-child,th:last-child{text-align:right}
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
 <div id="printArea"></div>
 <script>
-var APP={nama:'MyWarisan',ver:'0.9',tarikh:'22 Nov 2026',tahun:2026};
+var APP={nama:'MyWarisan',ver:'1.0',tarikh:'22 Nov 2026',tahun:2026};
 var KEY='mywarisan_v1';
 var insToggleFn=null;
 var KAT=[
@@ -390,7 +390,13 @@ function wireHarta(){
   var th=/tabung haji/i.test(nm.value),n=document.getElementById('penNote');
   if(n)n.textContent=(has&&th)?'Tabung Haji: penama mesti waris yang layak. Semak sama ada waris ganti layak.':'Boleh tukar kepada waris lain yang dah didaftar di tab Waris.'
  }
- kat.onchange=function(){upd();insUpd()};nm.oninput=upd;upd();insUpd()
+ kat.onchange=function(){upd();insUpd()};nm.oninput=upd;upd();insUpd();
+ var ti=document.getElementById('f_insTamat'),tj=document.getElementById('f_jalanTamat'),nt=document.createElement('div');
+ nt.className='muted';nt.style.margin='4px 0 0';document.getElementById('w_jalanTamat').appendChild(nt);
+ var autoJ=!tj.value||tj.value===ti.value;
+ function dariIns(){if(autoJ){tj.value=ti.value;nt.textContent=ti.value?'Diisi automatik daripada tarikh insurans. Boleh diubah.':''}else nt.textContent=''}
+ ti.onchange=dariIns;ti.oninput=dariIns;
+ tj.onchange=function(){autoJ=(tj.value===ti.value);nt.textContent=''}
 }
 function closeSheet(){document.getElementById('sheet').classList.remove('on');cur=null}
 function saveForm(){
