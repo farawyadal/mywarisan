@@ -106,7 +106,7 @@ td:last-child,th:last-child{text-align:right}
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
 <div id="printArea"></div>
 <script>
-var APP={nama:'MyWarisan',ver:'1.0',tarikh:'22 Nov 2026',tahun:2026};
+var APP={nama:'MyWarisan',ver:'1.1',tarikh:'22 Nov 2026',tahun:2026};
 var KEY='mywarisan_v1';
 var insToggleFn=null;
 var KAT=[
@@ -179,7 +179,7 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function num(v){var n=parseFloat(v);return isNaN(n)?0:n}
-function rm(n){return 'RM '+(Math.round(n*100)/100).toLocaleString('en-MY',{minimumFractionDigits:0,maximumFractionDigits:2})}
+function rm(n){return 'RM '+(Math.round(n*100)/100).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function money(n){return S.hide?'RM ••••':rm(n)}
 function katOf(id){return KAT.filter(function(k){return k.id===id})[0]}
 function HA(){return S.harta.filter(function(x){return !x.arsip})}
